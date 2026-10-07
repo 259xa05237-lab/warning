@@ -1,0 +1,1143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NeuroDrive AI — Intelligent Driver Drowsiness Alert System</title>
+  <meta name="description" content="Real-time automotive AI driver drowsiness detection using computer vision, facial landmark tracking, eye aspect ratio (EAR), yawning detection, and head pose analysis.">
+  
+  <!-- Google Fonts: Inter for sleek UI, Orbitron for futuristic HUD telemetry, JetBrains Mono for metrics -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&family=Orbitron:wght@500;600;700;800;900&display=swap" rel="stylesheet">
+
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <!-- MediaPipe Face Mesh & Camera Utils CDN (Loaded asynchronously with graceful fallback) -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
+
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body class="theme-navy">
+  <!-- Interactive Neural Road Network Canvas -->
+  <canvas id="neural-bg-canvas" class="neural-bg-canvas"></canvas>
+
+  <!-- Ambient Glow Effects -->
+  <div class="ambient-glow glow-top-left"></div>
+  <div class="ambient-glow glow-top-right"></div>
+  <div class="ambient-glow glow-center"></div>
+
+  <!-- Critical Warning Overlay (Flashes when drowsy) -->
+  <div id="critical-alert-overlay" class="critical-alert-overlay hidden" aria-live="assertive" role="alert">
+    <div class="critical-alert-content">
+      <div class="alert-beacon-ring"></div>
+      <div class="alert-icon-wrap">
+        <i data-lucide="alert-triangle" class="icon-danger-pulse"></i>
+      </div>
+      <div class="alert-text-group">
+        <span class="alert-badge-tag">ADAS LEVEL 2 SAFETY INTERVENTION</span>
+        <h2 class="alert-headline">WAKE UP — DROWSINESS DETECTED!</h2>
+        <p class="alert-subtext">Prolonged eye closure and fatigue detected. Please focus on the road or take an immediate rest stop.</p>
+      </div>
+      <div class="alert-action-group">
+        <button id="btn-emergency-dismiss" class="btn-alert-dismiss">
+          <i data-lucide="check-circle-2"></i> I AM AWAKE & ALERT
+        </button>
+        <button id="btn-emergency-mute" class="btn-alert-mute">
+          <i data-lucide="volume-x"></i> SILENCE ALARM
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Navigation Header -->
+  <header class="app-header" id="app-header">
+    <div class="header-container">
+      <div class="brand-wrapper">
+        <div class="brand-logo-icon">
+          <div class="logo-core-pulse"></div>
+          <i data-lucide="shield-alert" class="brand-icon"></i>
+        </div>
+        <div class="brand-text-block">
+          <div class="brand-title">
+            NEURODRIVE <span class="brand-title-accent">AI</span>
+          </div>
+          <div class="brand-subtitle">Intelligent Driver Monitoring System</div>
+        </div>
+      </div>
+
+      <nav class="main-nav" id="main-nav">
+        <a href="#hero-section" class="nav-link active" data-nav="hero">
+          <i data-lucide="home"></i> <span>Overview</span>
+        </a>
+        <a href="#dashboard-section" class="nav-link" data-nav="dashboard">
+          <i data-lucide="activity"></i> <span>Live Monitor</span>
+        </a>
+        <a href="#analytics-section" class="nav-link" data-nav="analytics">
+          <i data-lucide="cpu"></i> <span>Telemetry</span>
+        </a>
+        <a href="#alert-section" class="nav-link" data-nav="alerts">
+          <i data-lucide="bell"></i> <span>Alert Center</span>
+        </a>
+        <a href="#architecture-section" class="nav-link" data-nav="architecture">
+          <i data-lucide="git-merge"></i> <span>Architecture</span>
+        </a>
+        <a href="#settings-section" class="nav-link" data-nav="settings">
+          <i data-lucide="sliders"></i> <span>Settings</span>
+        </a>
+      </nav>
+
+      <div class="header-actions">
+        <!-- Audio Enablement Badge -->
+        <button id="btn-audio-toggle" class="header-pill audio-pill" title="Audio Alarm Status">
+          <i data-lucide="volume-2" id="audio-pill-icon"></i>
+          <span id="audio-pill-text">Audio Ready</span>
+        </button>
+
+        <!-- System Online Indicator -->
+        <div class="system-status-indicator" id="system-status-badge">
+          <span class="status-pulse-dot"></span>
+          <span class="status-label" id="system-status-label">SYSTEM ONLINE</span>
+        </div>
+
+        <!-- Mobile Navigation Toggle -->
+        <button id="btn-mobile-menu" class="btn-mobile-menu" aria-label="Toggle Navigation Menu">
+          <i data-lucide="menu"></i>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="app-main-content">
+    
+    <!-- 1. HERO / LANDING SECTION -->
+    <section class="hero-section" id="hero-section">
+      <div class="hero-container">
+        <div class="hero-content">
+          <div class="hero-badge">
+            <span class="hero-badge-glow"></span>
+            <i data-lucide="sparkles" class="hero-badge-icon"></i>
+            <span>NEXT-GEN AUTOMOTIVE COMPUTER VISION</span>
+          </div>
+
+          <h1 class="hero-headline">
+            Stay Awake.<br>
+            <span class="headline-gradient">Stay Safe.</span><br>
+            Let AI Watch the Road.
+          </h1>
+
+          <p class="hero-description">
+            Real-time computer vision that monitors driver fatigue, eye closure (EAR), yawning frequency (MAR), and head movement (3D pose) to detect drowsiness before it becomes dangerous.
+          </p>
+
+          <div class="hero-cta-group">
+            <button id="btn-hero-start-monitoring" class="btn-primary btn-glow">
+              <i data-lucide="camera"></i>
+              <span>START LIVE MONITORING</span>
+            </button>
+            <button id="btn-hero-demo-mode" class="btn-secondary">
+              <i data-lucide="play-circle"></i>
+              <span>LAUNCH DEMO SIMULATION</span>
+            </button>
+            <a href="#architecture-section" class="btn-ghost">
+              <i data-lucide="eye"></i>
+              <span>HOW IT WORKS</span>
+            </a>
+          </div>
+
+          <div class="hero-stats-row">
+            <div class="hero-stat-item">
+              <span class="stat-number" id="stat-latency">&lt; 15 ms</span>
+              <span class="stat-label">Inference Latency</span>
+            </div>
+            <div class="stat-divider"></div>
+            <div class="hero-stat-item">
+              <span class="stat-number">468 pts</span>
+              <span class="stat-label">3D Face Mesh</span>
+            </div>
+            <div class="stat-divider"></div>
+            <div class="hero-stat-item">
+              <span class="stat-number">99.4%</span>
+              <span class="stat-label">Closure Accuracy</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Hero AI Radar / Face Mesh Scanner Widget -->
+        <div class="hero-visual-card">
+          <div class="scanner-hologram-wrap">
+            <div class="holo-ring holo-ring-outer"></div>
+            <div class="holo-ring holo-ring-middle"></div>
+            <div class="holo-ring holo-ring-inner"></div>
+            <div class="radar-sweep"></div>
+
+            <!-- Animated Face Wireframe Graphic -->
+            <div class="face-mesh-wireframe-svg">
+              <svg viewBox="0 0 200 240" class="face-vector">
+                <!-- Face Contour -->
+                <path d="M100,20 Q160,20 170,90 Q180,160 100,220 Q20,160 30,90 Q40,20 100,20 Z" class="svg-wire-path face-oval" />
+                <!-- Forehead nodes -->
+                <circle cx="100" cy="40" r="2.5" class="svg-node" />
+                <circle cx="70" cy="50" r="2.5" class="svg-node" />
+                <circle cx="130" cy="50" r="2.5" class="svg-node" />
+                <!-- Eyebrows -->
+                <path d="M55,75 Q75,68 92,75" class="svg-wire-path eyebrow" />
+                <path d="M108,75 Q125,68 145,75" class="svg-wire-path eyebrow" />
+                <!-- Left Eye -->
+                <path d="M60,92 Q75,82 90,92 Q75,102 60,92 Z" class="svg-wire-path eye-shape eye-left-svg" />
+                <circle cx="75" cy="92" r="3" class="svg-pupil" />
+                <!-- Right Eye -->
+                <path d="M110,92 Q125,82 140,92 Q125,102 110,92 Z" class="svg-wire-path eye-shape eye-right-svg" />
+                <circle cx="125" cy="92" r="3" class="svg-pupil" />
+                <!-- Nose Bridge & Tip -->
+                <path d="M100,75 L100,135 L90,145 L100,148 L110,145 L100,135" class="svg-wire-path nose-path" />
+                <!-- Mouth -->
+                <path d="M72,175 Q100,165 128,175 Q100,195 72,175 Z" class="svg-wire-path mouth-path" />
+                <!-- Mesh triangulation lines -->
+                <line x1="75" y1="92" x2="100" y2="135" class="svg-mesh-line" />
+                <line x1="125" y1="92" x2="100" y2="135" class="svg-mesh-line" />
+                <line x1="100" y1="148" x2="100" y2="175" class="svg-mesh-line" />
+                <line x1="72" y1="175" x2="100" y2="220" class="svg-mesh-line" />
+                <line x1="128" y1="175" x2="100" y2="220" class="svg-mesh-line" />
+              </svg>
+            </div>
+
+            <!-- Scanner Horizontal Bar -->
+            <div class="holo-scan-bar"></div>
+
+            <div class="holo-status-pill">
+              <span class="pulsing-cyan-dot"></span>
+              <span>AI VISION ACTIVE</span>
+            </div>
+
+            <div class="holo-telemetry-tag holo-tag-tl">ADAS FEED : LOCKED</div>
+            <div class="holo-tag-br holo-telemetry-tag">EAR 0.34 • MAR 0.12</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 2. REAL-TIME SENSOR QUICK GLANCE PANEL -->
+    <section class="sensor-bar-section">
+      <div class="sensor-bar-container">
+        <div class="sensor-chip" id="chip-face">
+          <div class="sensor-chip-icon"><i data-lucide="scan-face"></i></div>
+          <div class="sensor-chip-body">
+            <span class="chip-title">FACE</span>
+            <span class="chip-status status-ok" id="sensor-face-val">DETECTED</span>
+          </div>
+        </div>
+
+        <div class="sensor-chip" id="chip-eyes">
+          <div class="sensor-chip-icon"><i data-lucide="eye"></i></div>
+          <div class="sensor-chip-body">
+            <span class="chip-title">EYES</span>
+            <span class="chip-status status-ok" id="sensor-eyes-val">OPEN</span>
+          </div>
+        </div>
+
+        <div class="sensor-chip" id="chip-mouth">
+          <div class="sensor-chip-icon"><i data-lucide="smile"></i></div>
+          <div class="sensor-chip-body">
+            <span class="chip-title">MOUTH</span>
+            <span class="chip-status status-ok" id="sensor-mouth-val">NORMAL</span>
+          </div>
+        </div>
+
+        <div class="sensor-chip" id="chip-head">
+          <div class="sensor-chip-icon"><i data-lucide="compass"></i></div>
+          <div class="sensor-chip-body">
+            <span class="chip-title">HEAD</span>
+            <span class="chip-status status-ok" id="sensor-head-val">STABLE</span>
+          </div>
+        </div>
+
+        <div class="sensor-chip" id="chip-camera">
+          <div class="sensor-chip-icon"><i data-lucide="video"></i></div>
+          <div class="sensor-chip-body">
+            <span class="chip-title">CAMERA</span>
+            <span class="chip-status status-ok" id="sensor-camera-val">STANDBY</span>
+          </div>
+        </div>
+
+        <div class="sensor-chip" id="chip-audio">
+          <div class="sensor-chip-icon"><i data-lucide="volume-2"></i></div>
+          <div class="sensor-chip-body">
+            <span class="chip-title">AUDIO ALERT</span>
+            <span class="chip-status status-ok" id="sensor-audio-val">READY</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3. LIVE MONITORING DASHBOARD (PRIMARY ADAS WORKSPACE) -->
+    <section class="dashboard-section" id="dashboard-section">
+      <div class="dashboard-container">
+        
+        <!-- Section Header with Controls -->
+        <div class="dashboard-top-bar">
+          <div class="section-title-wrap">
+            <div class="section-pill">LIVE ADAS SUITE</div>
+            <h2 class="section-title">Live Driver Monitoring Dashboard</h2>
+          </div>
+
+          <div class="dashboard-controls-cluster">
+            <!-- Mode Switcher -->
+            <div class="mode-toggle-group">
+              <button id="btn-mode-camera" class="mode-btn active" title="Use Live Web Camera">
+                <i data-lucide="camera"></i> Webcam
+              </button>
+              <button id="btn-mode-demo" class="mode-btn" title="Run Automated Demo Simulation">
+                <i data-lucide="play"></i> Demo Simulation
+              </button>
+            </div>
+
+            <!-- Start/Stop Monitoring Button -->
+            <button id="btn-toggle-stream" class="btn-action-primary">
+              <i data-lucide="power" id="toggle-stream-icon"></i>
+              <span id="toggle-stream-text">START CAMERA</span>
+            </button>
+
+            <!-- Test Buzzer Button -->
+            <button id="btn-test-buzzer" class="btn-action-secondary" title="Test Alert Siren">
+              <i data-lucide="bell-ring"></i>
+              <span>TEST ALARM</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Simulation Notice Banner (Visible during demo mode) -->
+        <div id="simulation-banner" class="simulation-banner hidden">
+          <div class="sim-banner-left">
+            <span class="sim-pulsing-badge">DEMO SIMULATION ACTIVE</span>
+            <span class="sim-banner-desc" id="sim-scenario-desc">Simulated Scenario: Driver Alert & Focused on Road</span>
+          </div>
+          <div class="sim-banner-controls">
+            <button id="btn-sim-prev" class="btn-sim-step" title="Previous Phase"><i data-lucide="skip-back"></i></button>
+            <button id="btn-sim-playpause" class="btn-sim-step" title="Pause / Play Simulation"><i data-lucide="pause" id="sim-playpause-icon"></i></button>
+            <button id="btn-sim-next" class="btn-sim-step" title="Next Phase"><i data-lucide="skip-forward"></i></button>
+            <button id="btn-sim-exit" class="btn-sim-exit" title="Exit Simulation">Exit Demo</button>
+          </div>
+        </div>
+
+        <!-- PRIMARY DASHBOARD GRID -->
+        <div class="dashboard-grid">
+          
+          <!-- LEFT COLUMN: LIVE VIDEO FEED & COMPUTER VISION HUD -->
+          <div class="dashboard-col-left">
+            <div class="glass-card camera-panel-card" id="camera-panel-wrapper">
+              
+              <!-- Camera Panel Header -->
+              <div class="card-header camera-card-header">
+                <div class="card-title-group">
+                  <div class="live-dot-indicator" id="camera-live-dot"></div>
+                  <span class="card-title-text">LIVE DRIVER MONITOR</span>
+                  <span class="camera-fps-tag" id="hud-fps-tag">30 FPS</span>
+                </div>
+                <div class="camera-meta-tags">
+                  <span class="meta-tag" id="hud-engine-tag">MEDIAPIPE v0.4</span>
+                  <span class="meta-tag" id="hud-res-tag">HD 1280x720</span>
+                </div>
+              </div>
+
+              <!-- Camera Viewport Container -->
+              <div class="camera-viewport" id="camera-viewport">
+                
+                <!-- Actual HTML5 Video Element (Hidden or visible based on stream) -->
+                <video id="webcam-video" playsinline muted autoplay class="webcam-video-element"></video>
+                
+                <!-- Main Overlay Canvas for Face Mesh, Landmarks & HUD Brackets -->
+                <canvas id="vision-canvas" class="vision-overlay-canvas"></canvas>
+
+                <!-- Vertical ADAS Laser Scanning Line -->
+                <div class="camera-laser-scanline" id="camera-laser-scan"></div>
+
+                <!-- HUD Reticles & Corner Accents -->
+                <div class="hud-corner hud-corner-tl"></div>
+                <div class="hud-corner hud-corner-tr"></div>
+                <div class="hud-corner hud-corner-bl"></div>
+                <div class="hud-corner hud-corner-br"></div>
+
+                <!-- HUD Live Overlay Badges -->
+                <div class="camera-hud-overlays">
+                  <div class="hud-badge hud-badge-top-left">
+                    <span class="hud-key">FACE TRACKING:</span>
+                    <span class="hud-val status-green" id="hud-face-status">FACE DETECTED</span>
+                  </div>
+                  <div class="hud-badge hud-badge-top-right">
+                    <span class="hud-key">CAMERA:</span>
+                    <span class="hud-val status-green" id="hud-cam-status">ACTIVE</span>
+                  </div>
+                  <div class="hud-badge hud-badge-bottom-left">
+                    <span class="hud-key">EYES:</span>
+                    <span class="hud-val status-green" id="hud-eye-status">OPEN (EAR 0.32)</span>
+                  </div>
+                  <div class="hud-badge hud-badge-bottom-right">
+                    <span class="hud-key">HEAD:</span>
+                    <span class="hud-val status-green" id="hud-head-status">NORMAL (0.4°)</span>
+                  </div>
+                </div>
+
+                <!-- Fallback / Standby Screen (Shown when camera is off) -->
+                <div id="camera-placeholder" class="camera-placeholder-screen">
+                  <div class="placeholder-icon-wrap">
+                    <div class="placeholder-radar-ring"></div>
+                    <i data-lucide="video-off" class="placeholder-icon"></i>
+                  </div>
+                  <h3 class="placeholder-title">CAMERA FEED STANDBY</h3>
+                  <p class="placeholder-text">Click "Start Camera" to enable live webcam analysis or launch "Demo Simulation".</p>
+                  <div class="placeholder-buttons">
+                    <button id="btn-standby-start" class="btn-primary btn-sm">
+                      <i data-lucide="camera"></i> Enable Camera
+                    </button>
+                    <button id="btn-standby-demo" class="btn-secondary btn-sm">
+                      <i data-lucide="play"></i> Start Demo
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Camera Permission/Error Notification Toast -->
+                <div id="camera-permission-banner" class="camera-alert-banner hidden">
+                  <i data-lucide="info"></i>
+                  <span id="camera-alert-msg">Camera access required for live driver monitoring.</span>
+                </div>
+
+              </div>
+
+              <!-- Camera Bottom Telemetry Bar -->
+              <div class="camera-telemetry-footer">
+                <div class="tel-item">
+                  <span class="tel-lbl">LANDMARKS:</span>
+                  <span class="tel-val" id="tel-landmark-count">468 PTS</span>
+                </div>
+                <div class="tel-item">
+                  <span class="tel-lbl">CONFIDENCE:</span>
+                  <span class="tel-val" id="tel-confidence-val">98.6%</span>
+                </div>
+                <div class="tel-item">
+                  <span class="tel-lbl">EAR VALUE:</span>
+                  <span class="tel-val" id="tel-ear-val">0.32</span>
+                </div>
+                <div class="tel-item">
+                  <span class="tel-lbl">MAR VALUE:</span>
+                  <span class="tel-val" id="tel-mar-val">0.12</span>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+          <!-- RIGHT COLUMN: DRIVER STATUS & INTELLIGENCE SCORING -->
+          <div class="dashboard-col-right">
+            
+            <!-- 4. DRIVER STATUS & SCORE CARD -->
+            <div class="glass-card status-master-card" id="driver-status-card">
+              <div class="card-header">
+                <div class="card-title-group">
+                  <i data-lucide="shield-check" class="card-header-icon" id="status-card-icon"></i>
+                  <span class="card-title-text">DRIVER STATUS</span>
+                </div>
+                <div class="status-badge-chip badge-alert" id="master-status-badge">
+                  <span class="pulse-chip-dot"></span>
+                  <span id="master-status-text">ALERT</span>
+                </div>
+              </div>
+
+              <div class="status-card-body">
+                <!-- Circular Drowsiness Gauge -->
+                <div class="circular-gauge-container">
+                  <svg class="circular-gauge-svg" viewBox="0 0 160 160">
+                    <!-- Background Track -->
+                    <circle class="gauge-circle-bg" cx="80" cy="80" r="68"></circle>
+                    <!-- Animated Value Arc -->
+                    <circle class="gauge-circle-progress" id="gauge-progress-circle" cx="80" cy="80" r="68"></circle>
+                  </svg>
+                  <div class="gauge-center-content">
+                    <span class="gauge-score-val" id="gauge-score-number">18</span>
+                    <span class="gauge-score-max">/ 100</span>
+                    <span class="gauge-score-label">DROWSINESS SCORE</span>
+                  </div>
+                </div>
+
+                <!-- Status Tier Legend Indicator -->
+                <div class="status-tiers-track">
+                  <div class="tier-segment tier-green active" id="tier-green-seg">
+                    <span class="tier-dot"></span>
+                    <span class="tier-text">0–29 ALERT</span>
+                  </div>
+                  <div class="tier-segment tier-yellow" id="tier-yellow-seg">
+                    <span class="tier-dot"></span>
+                    <span class="tier-text">30–59 WARNING</span>
+                  </div>
+                  <div class="tier-segment tier-red" id="tier-red-seg">
+                    <span class="tier-dot"></span>
+                    <span class="tier-text">60–100 DROWSY</span>
+                  </div>
+                </div>
+
+                <!-- Live Status Message -->
+                <div class="status-dynamic-summary" id="status-dynamic-summary">
+                  <i data-lucide="check-circle" id="status-summary-icon"></i>
+                  <span id="status-summary-text">Driver is vigilant and focused on the roadway.</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- 8. DROWSINESS INTELLIGENCE ENGINE BREAKDOWN -->
+            <div class="glass-card intelligence-card">
+              <div class="card-header">
+                <div class="card-title-group">
+                  <i data-lucide="brain-circuit" class="card-header-icon"></i>
+                  <span class="card-title-text">DROWSINESS INTELLIGENCE ENGINE</span>
+                </div>
+                <span class="card-badge-sub">MULTI-BIOMETRIC FUSION</span>
+              </div>
+
+              <div class="intel-card-body">
+                <div class="intel-meter-row">
+                  <div class="intel-meta">
+                    <span class="intel-name"><i data-lucide="eye"></i> Eye Closure Duration</span>
+                    <span class="intel-score-tag" id="score-tag-eye">+0 / 40</span>
+                  </div>
+                  <div class="intel-progress-bar">
+                    <div class="intel-bar-fill" id="bar-fill-eye" style="width: 0%;"></div>
+                  </div>
+                </div>
+
+                <div class="intel-meter-row">
+                  <div class="intel-meta">
+                    <span class="intel-name"><i data-lucide="zap"></i> Frequent / Rapid Blinking</span>
+                    <span class="intel-score-tag" id="score-tag-blink">+0 / 15</span>
+                  </div>
+                  <div class="intel-progress-bar">
+                    <div class="intel-bar-fill" id="bar-fill-blink" style="width: 0%;"></div>
+                  </div>
+                </div>
+
+                <div class="intel-meter-row">
+                  <div class="intel-meta">
+                    <span class="intel-name"><i data-lucide="smile"></i> Yawning Frequency</span>
+                    <span class="intel-score-tag" id="score-tag-yawn">+0 / 20</span>
+                  </div>
+                  <div class="intel-progress-bar">
+                    <div class="intel-bar-fill" id="bar-fill-yawn" style="width: 0%;"></div>
+                  </div>
+                </div>
+
+                <div class="intel-meter-row">
+                  <div class="intel-meta">
+                    <span class="intel-name"><i data-lucide="arrow-down-circle"></i> Head Nodding / Sagging</span>
+                    <span class="intel-score-tag" id="score-tag-nod">+0 / 15</span>
+                  </div>
+                  <div class="intel-progress-bar">
+                    <div class="intel-bar-fill" id="bar-fill-nod" style="width: 0%;"></div>
+                  </div>
+                </div>
+
+                <div class="intel-meter-row">
+                  <div class="intel-meta">
+                    <span class="intel-name"><i data-lucide="compass"></i> Off-Center Head Pose</span>
+                    <span class="intel-score-tag" id="score-tag-pose">+0 / 10</span>
+                  </div>
+                  <div class="intel-progress-bar">
+                    <div class="intel-bar-fill" id="bar-fill-pose" style="width: 0%;"></div>
+                  </div>
+                </div>
+
+                <div class="intel-footer-note">
+                  <i data-lucide="info"></i>
+                  <span>Multiple biometric indicators are dynamically combined using Kalman-filtered fusion to eliminate false alarms caused by natural blinking.</span>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- 4. ANALYTICS & TELEMETRY SECTION (EYE CLOSURE, YAWN, HEAD POSE) -->
+    <section class="analytics-section" id="analytics-section">
+      <div class="analytics-container">
+        <div class="section-title-wrap text-center">
+          <div class="section-pill">BIOMETRIC TELEMETRY</div>
+          <h2 class="section-title">Deep Computer Vision Analytics</h2>
+          <p class="section-subtitle">Real-time landmark measurements, aspect ratios, and spatial head pose tracking.</p>
+        </div>
+
+        <div class="analytics-cards-grid">
+          
+          <!-- 5. EYE CLOSURE ANALYSIS CARD -->
+          <div class="glass-card metric-card">
+            <div class="card-header">
+              <div class="card-title-group">
+                <i data-lucide="eye" class="card-header-icon text-cyan"></i>
+                <span class="card-title-text">EYE CLOSURE ANALYSIS</span>
+              </div>
+              <span class="card-badge-pill" id="badge-eye-state">OPEN</span>
+            </div>
+
+            <div class="metric-card-body">
+              <!-- Animated Eye Visualizer -->
+              <div class="eyes-visualizer-container">
+                <div class="eye-graphic-box">
+                  <span class="eye-box-label">LEFT EYE</span>
+                  <div class="eye-svg-wrapper">
+                    <svg viewBox="0 0 100 60" class="eye-dynamic-svg" id="svg-left-eye">
+                      <path d="M5,30 Q50,5 95,30 Q50,55 5,30 Z" class="eye-sclera" />
+                      <circle cx="50" cy="30" r="14" class="eye-iris" id="iris-left" />
+                      <circle cx="50" cy="30" r="6" class="eye-pupil" id="pupil-left" />
+                      <path d="M5,30 Q50,5 95,30" class="eyelid eyelid-top" id="eyelid-left-top" />
+                    </svg>
+                  </div>
+                  <span class="eye-box-state status-ok" id="txt-left-eye-state">OPEN</span>
+                </div>
+
+                <div class="eye-graphic-box">
+                  <span class="eye-box-label">RIGHT EYE</span>
+                  <div class="eye-svg-wrapper">
+                    <svg viewBox="0 0 100 60" class="eye-dynamic-svg" id="svg-right-eye">
+                      <path d="M5,30 Q50,5 95,30 Q50,55 5,30 Z" class="eye-sclera" />
+                      <circle cx="50" cy="30" r="14" class="eye-iris" id="iris-right" />
+                      <circle cx="50" cy="30" r="6" class="eye-pupil" id="pupil-right" />
+                      <path d="M5,30 Q50,5 95,30" class="eyelid eyelid-top" id="eyelid-right-top" />
+                    </svg>
+                  </div>
+                  <span class="eye-box-state status-ok" id="txt-right-eye-state">OPEN</span>
+                </div>
+              </div>
+
+              <!-- Eye Numerical Metrics -->
+              <div class="metrics-stats-grid">
+                <div class="metric-stat-box">
+                  <span class="m-label">Closure Duration</span>
+                  <span class="m-val" id="val-eye-duration">0.00 <span class="m-unit">sec</span></span>
+                  <div class="m-progress-mini">
+                    <div class="m-bar-mini" id="bar-closure-duration" style="width: 0%;"></div>
+                  </div>
+                </div>
+
+                <div class="metric-stat-box">
+                  <span class="m-label">Blink Rate</span>
+                  <span class="m-val" id="val-blink-rate">14 <span class="m-unit">/ min</span></span>
+                  <span class="m-sub">Normal (12–20/min)</span>
+                </div>
+
+                <div class="metric-stat-box">
+                  <span class="m-label">Avg EAR Ratio</span>
+                  <span class="m-val" id="val-ear-ratio">0.31</span>
+                  <span class="m-sub">Threshold &lt; 0.21</span>
+                </div>
+
+                <div class="metric-stat-box">
+                  <span class="m-label">Total Blinks</span>
+                  <span class="m-val" id="val-total-blinks">28</span>
+                  <span class="m-sub">Session Count</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 6. YAWN MONITOR CARD -->
+          <div class="glass-card metric-card">
+            <div class="card-header">
+              <div class="card-title-group">
+                <i data-lucide="smile" class="card-header-icon text-cyan"></i>
+                <span class="card-title-text">YAWN MONITOR</span>
+              </div>
+              <span class="card-badge-pill" id="badge-mouth-state">NORMAL</span>
+            </div>
+
+            <div class="metric-card-body">
+              <!-- Animated Mouth Visualizer -->
+              <div class="mouth-visualizer-container">
+                <div class="mouth-mesh-box">
+                  <svg viewBox="0 0 140 70" class="mouth-dynamic-svg" id="svg-mouth">
+                    <!-- Outer Lips -->
+                    <path d="M15,35 Q70,20 125,35 Q70,50 15,35 Z" class="mouth-outer-lips" id="mouth-outer" />
+                    <!-- Inner Mouth Cavity -->
+                    <path d="M30,35 Q70,30 110,35 Q70,40 30,35 Z" class="mouth-inner-cavity" id="mouth-inner" />
+                    <!-- Landmark Dots -->
+                    <circle cx="15" cy="35" r="2.5" class="svg-node" />
+                    <circle cx="125" cy="35" r="2.5" class="svg-node" />
+                    <circle cx="70" cy="20" r="2.5" class="svg-node" id="mouth-top-node" />
+                    <circle cx="70" cy="50" r="2.5" class="svg-node" id="mouth-bottom-node" />
+                  </svg>
+                </div>
+                <div class="mouth-state-readout">
+                  <span class="mouth-readout-lbl">Current Mouth State:</span>
+                  <span class="mouth-readout-val status-ok" id="txt-mouth-state-desc">NORMAL (CLOSED)</span>
+                </div>
+              </div>
+
+              <!-- Yawn Numerical Metrics -->
+              <div class="metrics-stats-grid">
+                <div class="metric-stat-box">
+                  <span class="m-label">Yawns Detected</span>
+                  <span class="m-val text-amber" id="val-yawns-count">0</span>
+                  <span class="m-sub">Session Total</span>
+                </div>
+
+                <div class="metric-stat-box">
+                  <span class="m-label">Mouth Aspect (MAR)</span>
+                  <span class="m-val" id="val-mar-ratio">0.12</span>
+                  <span class="m-sub">Yawn &gt; 0.55</span>
+                </div>
+
+                <div class="metric-stat-box">
+                  <span class="m-label">Opening Duration</span>
+                  <span class="m-val" id="val-mouth-duration">0.0 <span class="m-unit">sec</span></span>
+                  <div class="m-progress-mini">
+                    <div class="m-bar-mini" id="bar-yawn-duration" style="width: 0%;"></div>
+                  </div>
+                </div>
+
+                <div class="metric-stat-box">
+                  <span class="m-label">Yawn Fatigue Impact</span>
+                  <span class="m-val text-cyan" id="val-yawn-impact">+0 <span class="m-unit">pts</span></span>
+                  <span class="m-sub">Scoring Weight</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 7. HEAD POSE ANALYSIS CARD -->
+          <div class="glass-card metric-card">
+            <div class="card-header">
+              <div class="card-title-group">
+                <i data-lucide="compass" class="card-header-icon text-cyan"></i>
+                <span class="card-title-text">HEAD POSE ANALYSIS</span>
+              </div>
+              <span class="card-badge-pill" id="badge-head-state">NORMAL</span>
+            </div>
+
+            <div class="metric-card-body">
+              <!-- 3D Head Orientation Gizmo -->
+              <div class="head-pose-gizmo-wrapper">
+                <div class="gizmo-3d-scene" id="head-3d-scene">
+                  <!-- Wireframe 3D Cube / Head Gimbal -->
+                  <div class="gimbal-cube" id="gimbal-cube">
+                    <div class="cube-face cube-front"><i data-lucide="user"></i></div>
+                    <div class="cube-face cube-back"></div>
+                    <div class="cube-face cube-left"></div>
+                    <div class="cube-face cube-right"></div>
+                    <div class="cube-face cube-top"></div>
+                    <div class="cube-face cube-bottom"></div>
+                  </div>
+                  <!-- Artificial Horizon Line -->
+                  <div class="attitude-horizon" id="attitude-horizon"></div>
+                </div>
+
+                <div class="head-direction-readout">
+                  <span class="gizmo-lbl">Orientation:</span>
+                  <span class="gizmo-val status-ok" id="txt-head-direction">CENTER / FORWARD</span>
+                </div>
+              </div>
+
+              <!-- Head Pose Numerical Metrics -->
+              <div class="metrics-stats-grid">
+                <div class="metric-stat-box">
+                  <span class="m-label">Pitch (Nodding)</span>
+                  <span class="m-val" id="val-pitch-deg">2.4°</span>
+                  <span class="m-sub" id="sub-pitch-desc">Level (&plusmn;15°)</span>
+                </div>
+
+                <div class="metric-stat-box">
+                  <span class="m-label">Yaw (Turn Left/Right)</span>
+                  <span class="m-val" id="val-yaw-deg">-1.8°</span>
+                  <span class="m-sub" id="sub-yaw-desc">Forward facing</span>
+                </div>
+
+                <div class="metric-stat-box">
+                  <span class="m-label">Roll (Tilt)</span>
+                  <span class="m-val" id="val-roll-deg">0.7°</span>
+                  <span class="m-sub" id="sub-roll-desc">Neutral</span>
+                </div>
+
+                <div class="metric-stat-box">
+                  <span class="m-label">Nod Events</span>
+                  <span class="m-val" id="val-nod-count">0</span>
+                  <span class="m-sub">Micro-sleep nods</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </section>
+
+    <!-- 5. ALERT CENTER & EVENT HISTORY LOG -->
+    <section class="alert-section" id="alert-section">
+      <div class="alert-container">
+        <div class="glass-card alert-center-card">
+          <div class="card-header">
+            <div class="card-title-group">
+              <i data-lucide="bell" class="card-header-icon text-cyan"></i>
+              <span class="card-title-text">ALERT CENTER &amp; TELEMETRY LOG</span>
+            </div>
+            <div class="alert-center-actions">
+              <button id="btn-clear-alerts" class="btn-ghost-sm"><i data-lucide="trash-2"></i> Clear Log</button>
+              <button id="btn-export-log" class="btn-ghost-sm"><i data-lucide="download"></i> Export Data</button>
+            </div>
+          </div>
+
+          <div class="alert-center-body">
+            <!-- Alert Filter Chips -->
+            <div class="alert-filter-bar">
+              <button class="filter-chip active" data-filter="all">ALL EVENTS (<span id="count-all-events">8</span>)</button>
+              <button class="filter-chip" data-filter="critical">CRITICAL (<span id="count-critical-events">0</span>)</button>
+              <button class="filter-chip" data-filter="warning">WARNINGS (<span id="count-warning-events">1</span>)</button>
+              <button class="filter-chip" data-filter="info">SYSTEM INFO (<span id="count-info-events">7</span>)</button>
+            </div>
+
+            <!-- Scrollable Event Log Stream -->
+            <div class="alert-log-stream" id="alert-log-stream">
+              <!-- Dynamically populated events -->
+              <div class="log-entry log-info" data-type="info">
+                <span class="log-timestamp">14:32:01</span>
+                <span class="log-badge badge-info">INFO</span>
+                <span class="log-message">NeuroDrive AI engine initialized. Neural road network active.</span>
+              </div>
+              <div class="log-entry log-info" data-type="info">
+                <span class="log-timestamp">14:32:05</span>
+                <span class="log-badge badge-info">INFO</span>
+                <span class="log-message">MediaPipe Face Mesh 468-point pipeline ready.</span>
+              </div>
+              <div class="log-entry log-info" data-type="info">
+                <span class="log-timestamp">14:32:08</span>
+                <span class="log-badge badge-info">INFO</span>
+                <span class="log-message">Driver face detected in ADAS primary bounding zone.</span>
+              </div>
+              <div class="log-entry log-info" data-type="info">
+                <span class="log-timestamp">14:32:12</span>
+                <span class="log-badge badge-info">BLINK</span>
+                <span class="log-message">Normal blink detected (Duration: 0.18s, EAR: 0.12).</span>
+              </div>
+              <div class="log-entry log-warning" data-type="warning">
+                <span class="log-timestamp">14:32:19</span>
+                <span class="log-badge badge-warning">YAWN</span>
+                <span class="log-message">Yawning detected (Duration: 1.8s, MAR: 0.62). Drowsiness score +20.</span>
+              </div>
+              <div class="log-entry log-info" data-type="info">
+                <span class="log-timestamp">14:32:27</span>
+                <span class="log-badge badge-info">RECOVERY</span>
+                <span class="log-message">Driver attention verified. Drowsiness score stabilized at 18/100.</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 6. SYSTEM ARCHITECTURE SECTION -->
+    <section class="architecture-section" id="architecture-section">
+      <div class="architecture-container">
+        <div class="section-title-wrap text-center">
+          <div class="section-pill">SYSTEM ARCHITECTURE</div>
+          <h2 class="section-title">End-to-End Processing Pipeline</h2>
+          <p class="section-subtitle">How high-frequency computer vision turns raw camera photons into life-saving ADAS interventions.</p>
+        </div>
+
+        <div class="pipeline-flowchart">
+          
+          <!-- Stage 1 -->
+          <div class="pipeline-node glass-card">
+            <div class="pipeline-step-num">01</div>
+            <div class="pipeline-node-icon"><i data-lucide="video"></i></div>
+            <h4 class="pipeline-node-title">CAMERA STREAM</h4>
+            <p class="pipeline-node-desc">High-framerate video capture via WebRTC / <code>getUserMedia</code> at 60 FPS.</p>
+            <div class="pipeline-glow-dot"></div>
+          </div>
+
+          <!-- Connector -->
+          <div class="pipeline-connector">
+            <div class="connector-line"></div>
+            <div class="connector-packet"></div>
+            <i data-lucide="chevron-right" class="connector-arrow"></i>
+          </div>
+
+          <!-- Stage 2 -->
+          <div class="pipeline-node glass-card">
+            <div class="pipeline-step-num">02</div>
+            <div class="pipeline-node-icon"><i data-lucide="scan"></i></div>
+            <h4 class="pipeline-node-title">FACE DETECTION</h4>
+            <p class="pipeline-node-desc">BlazeFace GPU pipeline detects driver bounding box &amp; ROI spatial anchors.</p>
+            <div class="pipeline-glow-dot"></div>
+          </div>
+
+          <!-- Connector -->
+          <div class="pipeline-connector">
+            <div class="connector-line"></div>
+            <div class="connector-packet"></div>
+            <i data-lucide="chevron-right" class="connector-arrow"></i>
+          </div>
+
+          <!-- Stage 3 -->
+          <div class="pipeline-node glass-card">
+            <div class="pipeline-step-num">03</div>
+            <div class="pipeline-node-icon"><i data-lucide="grid"></i></div>
+            <h4 class="pipeline-node-title">FACIAL LANDMARKS</h4>
+            <p class="pipeline-node-desc">468 high-precision 3D coordinates localized on eyelids, lips, and facial contours.</p>
+            <div class="pipeline-glow-dot"></div>
+          </div>
+
+          <!-- Connector -->
+          <div class="pipeline-connector">
+            <div class="connector-line"></div>
+            <div class="connector-packet"></div>
+            <i data-lucide="chevron-right" class="connector-arrow"></i>
+          </div>
+
+          <!-- Stage 4 -->
+          <div class="pipeline-node glass-card">
+            <div class="pipeline-step-num">04</div>
+            <div class="pipeline-node-icon"><i data-lucide="activity"></i></div>
+            <h4 class="pipeline-node-title">BIOMETRIC EXTRACTION</h4>
+            <p class="pipeline-node-desc">Real-time EAR, MAR &amp; Perspective-n-Point 3D head pose calculations.</p>
+            <div class="pipeline-glow-dot"></div>
+          </div>
+
+          <!-- Connector -->
+          <div class="pipeline-connector">
+            <div class="connector-line"></div>
+            <div class="connector-packet"></div>
+            <i data-lucide="chevron-right" class="connector-arrow"></i>
+          </div>
+
+          <!-- Stage 5 -->
+          <div class="pipeline-node glass-card">
+            <div class="pipeline-step-num">05</div>
+            <div class="pipeline-node-icon"><i data-lucide="brain-circuit"></i></div>
+            <h4 class="pipeline-node-title">FUSION ENGINE</h4>
+            <p class="pipeline-node-desc">Kalman-weighted Drowsiness Intelligence Engine computes 0–100 fatigue score.</p>
+            <div class="pipeline-glow-dot"></div>
+          </div>
+
+          <!-- Connector -->
+          <div class="pipeline-connector">
+            <div class="connector-line"></div>
+            <div class="connector-packet"></div>
+            <i data-lucide="chevron-right" class="connector-arrow"></i>
+          </div>
+
+          <!-- Stage 6 -->
+          <div class="pipeline-node glass-card highlight-node">
+            <div class="pipeline-step-num">06</div>
+            <div class="pipeline-node-icon"><i data-lucide="bell-ring"></i></div>
+            <h4 class="pipeline-node-title">REAL-TIME ALERT</h4>
+            <p class="pipeline-node-desc">Web Audio ADAS acoustic buzzer chime &amp; visual HUD safety intervention.</p>
+            <div class="pipeline-glow-dot alert-dot"></div>
+          </div>
+
+        </div>
+      </div>
+    </section>
+
+    <!-- 7. TECHNOLOGY STACK SECTION -->
+    <section class="tech-section" id="tech-section">
+      <div class="tech-container">
+        <div class="section-title-wrap text-center">
+          <div class="section-pill">TECHNOLOGY STACK</div>
+          <h2 class="section-title">Built with Cutting-Edge Web &amp; Vision Standards</h2>
+        </div>
+
+        <div class="tech-cards-grid">
+          <div class="tech-card glass-card">
+            <div class="tech-card-icon"><i data-lucide="eye"></i></div>
+            <h3 class="tech-card-title">MediaPipe Face Mesh</h3>
+            <p class="tech-card-desc">Sub-millisecond 468 3D landmark tensor inference operating entirely on client hardware with zero cloud latency.</p>
+            <span class="tech-tag">Computer Vision</span>
+          </div>
+
+          <div class="tech-card glass-card">
+            <div class="tech-card-icon"><i data-lucide="video"></i></div>
+            <h3 class="tech-card-title">WebRTC &amp; getUserMedia</h3>
+            <p class="tech-card-desc">Low-latency uncompressed camera video capture supporting custom resolutions, dynamic framing, and device selection.</p>
+            <span class="tech-tag">Hardware Access</span>
+          </div>
+
+          <div class="tech-card glass-card">
+            <div class="tech-card-icon"><i data-lucide="volume-2"></i></div>
+            <h3 class="tech-card-title">Web Audio API</h3>
+            <p class="tech-card-desc">Dual-oscillator frequency synthesized ADAS automotive alert chimes synthesized in real time with anti-clipping gain control.</p>
+            <span class="tech-tag">Acoustics Engine</span>
+          </div>
+
+          <div class="tech-card glass-card">
+            <div class="tech-card-icon"><i data-lucide="layers"></i></div>
+            <h3 class="tech-card-title">Canvas 2D &amp; 3D Matrix Math</h3>
+            <p class="tech-card-desc">Vectorized Euler pitch/yaw/roll estimation, dynamic facial landmark mesh overlays, and GPU-accelerated background rendering.</p>
+            <span class="tech-tag">Math &amp; Rendering</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 8. SETTINGS & CONFIGURATION PANEL -->
+    <section class="settings-section" id="settings-section">
+      <div class="settings-container">
+        <div class="glass-card settings-card">
+          <div class="card-header">
+            <div class="card-title-group">
+              <i data-lucide="sliders" class="card-header-icon text-cyan"></i>
+              <span class="card-title-text">SYSTEM PARAMETERS &amp; THRESHOLDS</span>
+            </div>
+            <button id="btn-reset-settings" class="btn-ghost-sm"><i data-lucide="rotate-ccw"></i> Reset to Default</button>
+          </div>
+
+          <div class="settings-body-grid">
+            
+            <!-- Setting 1: Eye Closure Duration Threshold -->
+            <div class="setting-item">
+              <div class="setting-info">
+                <label for="setting-eye-threshold" class="setting-label">Eye Closure Duration Threshold</label>
+                <p class="setting-desc">Consecutive seconds of closed eyes (EAR &lt; 0.20) before triggering a drowsy alarm. Prevents false alarms on blinks.</p>
+              </div>
+              <div class="setting-control-slider">
+                <input type="range" id="setting-eye-threshold" min="1.0" max="4.0" step="0.1" value="2.0" class="styled-slider">
+                <span class="slider-display-val" id="val-setting-eye-threshold">2.0 s</span>
+              </div>
+            </div>
+
+            <!-- Setting 2: Drowsiness Score Alarm Threshold -->
+            <div class="setting-item">
+              <div class="setting-info">
+                <label for="setting-score-threshold" class="setting-label">Drowsiness Score Threshold</label>
+                <p class="setting-desc">Composite intelligence score required to activate critical red alert state and emergency buzzer.</p>
+              </div>
+              <div class="setting-control-slider">
+                <input type="range" id="setting-score-threshold" min="30" max="90" step="5" value="60" class="styled-slider">
+                <span class="slider-display-val" id="val-setting-score-threshold">60 / 100</span>
+              </div>
+            </div>
+
+            <!-- Setting 3: Sensitivity Level -->
+            <div class="setting-item">
+              <div class="setting-info">
+                <label class="setting-label">Detection Sensitivity</label>
+                <p class="setting-desc">Adjusts EAR and MAR sensitivity thresholds for varying ambient lighting conditions and eyewear.</p>
+              </div>
+              <div class="setting-control-segmented">
+                <button class="seg-btn" data-sens="low">LOW</button>
+                <button class="seg-btn active" data-sens="medium">MEDIUM</button>
+                <button class="seg-btn" data-sens="high">HIGH</button>
+              </div>
+            </div>
+
+            <!-- Setting 4: Camera Device Selector -->
+            <div class="setting-item">
+              <div class="setting-info">
+                <label for="setting-camera-select" class="setting-label">Select Video Input Device</label>
+                <p class="setting-desc">Choose between integrated webcam or external USB/ADAS camera feed.</p>
+              </div>
+              <div class="setting-control-select">
+                <select id="setting-camera-select" class="styled-select">
+                  <option value="default">Default System Camera</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Setting 5: Biometric Toggles -->
+            <div class="setting-item full-width-setting">
+              <div class="setting-info">
+                <span class="setting-label">Active Detection Modules</span>
+                <p class="setting-desc">Enable or disable individual biometric tracking subsystems.</p>
+              </div>
+              <div class="toggle-chips-grid">
+                <label class="custom-toggle-card">
+                  <input type="checkbox" id="toggle-mod-blink" checked>
+                  <span class="toggle-card-body">
+                    <i data-lucide="eye"></i>
+                    <span>Blink Detection</span>
+                  </span>
+                </label>
+
+                <label class="custom-toggle-card">
+                  <input type="checkbox" id="toggle-mod-yawn" checked>
+                  <span class="toggle-card-body">
+                    <i data-lucide="smile"></i>
+                    <span>Yawn Detection</span>
+                  </span>
+                </label>
+
+                <label class="custom-toggle-card">
+                  <input type="checkbox" id="toggle-mod-head" checked>
+                  <span class="toggle-card-body">
+                    <i data-lucide="compass"></i>
+                    <span>Head Pose 3D</span>
+                  </span>
+                </label>
+
+                <label class="custom-toggle-card">
+                  <input type="checkbox" id="toggle-mod-audio" checked>
+                  <span class="toggle-card-body">
+                    <i data-lucide="volume-2"></i>
+                    <span>Audio Alert Siren</span>
+                  </span>
+                </label>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- FOOTER -->
+  <footer class="app-footer">
+    <div class="footer-container">
+      <div class="footer-brand-col">
+        <div class="brand-wrapper">
+          <div class="brand-logo-icon small-logo">
+            <i data-lucide="shield-alert" class="brand-icon"></i>
+          </div>
+          <div class="brand-text-block">
+            <div class="brand-title">NEURODRIVE <span class="brand-title-accent">AI</span></div>
+            <div class="brand-subtitle">Intelligent Driver Monitoring System</div>
+          </div>
+        </div>
+        <p class="footer-tagline">
+          Intelligent Driver Monitoring • Real-Time Computer Vision • Next-Gen Automotive Road Safety
+        </p>
+      </div>
+
+      <div class="footer-disclaimer-col">
+        <div class="disclaimer-badge">
+          <i data-lucide="alert-circle"></i>
+          <span>EDUCATIONAL &amp; RESEARCH PROTOTYPE</span>
+        </div>
+        <p class="disclaimer-text">
+          This system is an engineering demonstration and research prototype developed for academic and technical evaluation. It is not a certified automotive safety device and must not replace safe driving practices, driver vigilance, or certified automotive driver-assistance systems (ADAS).
+        </p>
+      </div>
+    </div>
+    <div class="footer-bottom-bar">
+      <span>&copy; 2026 NeuroDrive AI Automotive Safety Lab. All rights reserved.</span>
+      <span class="footer-build-tag">BUILD v2.4.8-RELEASE • MEDIAPIPE FACE MESH INTEGRATED</span>
+    </div>
+  </footer>
+
+  <!-- Modular Scripts -->
+  <script src="js/background-canvas.js"></script>
+  <script src="js/audio-alert.js"></script>
+  <script src="js/head-pose-gizmo.js"></script>
+  <script src="js/vision-engine.js"></script>
+  <script src="js/demo-controller.js"></script>
+  <script src="js/app.js"></script>
+  
+  <script>
+    // Initialize Lucide icons on load
+    document.addEventListener('DOMContentLoaded', () => {
+      if (window.lucide) {
+        window.lucide.createIcons();
+      }
+    });
+  </script>
+</body>
+</html>
